@@ -1,0 +1,19 @@
+{
+  "name": "beats-backend",
+  "version": "1.0.0",
+  "description": "Backend service for Beats music streaming platform",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon ./src/index.ts",
+    "start": "node ./build/index.js",
+    "build": "tsc -p ."
+  },
+  "keywords": [
+    "Learning",
+    "Project",
+    "Beats"
+  ],
+  "author": "Ashmin Bhujel",
+  "license": "ISC",
+  "packageManager": "pnpm@10.11.0"
+}
