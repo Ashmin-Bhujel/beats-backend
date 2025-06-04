@@ -163,4 +163,104 @@ The goal was to initialize and configure the basic setup of the project.
   });
   ```
 
-- [x] 🧪 Test the setup
+- [x] Test the setup
+
+## [ 2 ] Create `asyncHandler` and Custom Class for API Error and Response
+
+### `asyncHandler` Function
+
+- This utility function helps to handle asynchronous request and errors.
+- It reduces the redundant use of `try...catch`.
+
+  ```ts
+  import { Request, Response, NextFunction } from "express";
+
+  type Handler = (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => Promise<any> | void;
+
+  const asyncHandler = (handler: Handler) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+      return Promise.resolve(handler(req, res, next)).catch(next);
+    };
+  };
+
+  export { asyncHandler };
+  ```
+
+### Custom APIError Class
+
+- This custom class helps to send back error response in a specified standard format throughout the project.
+
+  ```ts
+  class APIError extends Error {
+    statusCode: number;
+    data: Record<string, any> | null;
+    errors: string[];
+    success: boolean;
+
+    constructor(
+      statusCode: number,
+      message: string = "Something went wrong",
+      data: Record<string, any> | null = null,
+      errors: string[] = []
+    ) {
+      super(message);
+      this.name = this.constructor.name;
+      this.statusCode = statusCode;
+      this.data = data;
+      this.errors = errors;
+      this.success = false;
+      Error.captureStackTrace(this, this.constructor);
+    }
+
+    toJSON() {
+      return {
+        statusCode: this.statusCode,
+        message: this.message,
+        data: this.data,
+        errors: this.errors,
+        success: this.success,
+      };
+    }
+  }
+
+  export { APIError };
+  ```
+
+### Custom APIResponse Class
+
+- This custom class helps to send back api response in a specified standard format throughout the project.
+
+  ```ts
+  class APIResponse {
+    statusCode: number;
+    message: string;
+    data: Record<string, any> | null;
+    success: boolean;
+
+    constructor(
+      statusCode: number,
+      message: string,
+      data: Record<string, any> | null = null
+    ) {
+      this.statusCode = statusCode;
+      this.message = message;
+      this.data = data;
+      this.success = statusCode < 400;
+    }
+
+    toJSON() {
+      return {
+        statusCode: this.statusCode,
+        message: this.message,
+        data: this.data,
+        success: this.success,
+      };
+    }
+  }
+
+  export { APIResponse };
+  ```
