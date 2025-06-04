@@ -2,6 +2,7 @@ import { config } from "dotenv";
 import express, { Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { APIError } from "./utils";
 
 // Accessing environment variables
 config();
@@ -36,7 +37,7 @@ app.get("/api/v1", (_, res: Response) => {
 
 // Handle undefined routes
 app.use((_, res: Response) => {
-  res.status(404).json({ message: "This route is not defined" });
+  res.status(404).json(new APIError(404, "This route is not defined"));
 });
 
 export { app };

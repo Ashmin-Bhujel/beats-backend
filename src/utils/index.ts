@@ -1,3 +1,4 @@
+import { APIError } from "./apiError";
 import { asyncHandler } from "./asyncHandler";
 
-export { asyncHandler };
+export { asyncHandler, APIError };
