@@ -2,7 +2,7 @@ import { config } from "dotenv";
 import express, { Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { APIError } from "./utils";
+import { APIError, APIResponse } from "./utils";
 
 // Accessing environment variables
 config();
@@ -25,14 +25,18 @@ app.use(express.static("public"));
 
 // Root route
 app.get("/", (_, res: Response) => {
-  res.status(200).json({
-    message: "Hello, World",
-  });
+  res
+    .status(200)
+    .json(
+      new APIResponse(200, "The backend service for Beats is up and running")
+    );
 });
 
 // API v1 route
 app.get("/api/v1", (_, res: Response) => {
-  res.status(200).json({ message: "API v1" });
+  res
+    .status(200)
+    .json(new APIResponse(200, "Backend service for Beats, API v1"));
 });
 
 // Handle undefined routes
