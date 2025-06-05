@@ -264,3 +264,189 @@ The goal was to initialize and configure the basic setup of the project.
 
   export { APIResponse };
   ```
+
+## [ 3 ] Connect to Database and Create User Types, Model
+
+### Connect to The Database
+
+- Used MongoDB with docker image to locally run database and connect to it using mongoose in the backend service.
+
+  ```yml
+  services:
+    mongo:
+      image: mongo
+      container_name: mongodb
+      restart: unless-stopped
+      ports:
+        - 27017:27017
+      environment:
+        - MONGO_INITDB_ROOT_USERNAME=<db_username>
+        - MONGO_INITDB_ROOT_PASSWORD=<db_password>
+      volumes:
+        - ./db/data:/data/db
+  ```
+
+### Create function to connect to MongoDB database.
+
+- Inside `database/index.ts` file
+
+  ```ts
+  import { config } from "dotenv";
+  import mongoose from "mongoose";
+
+  // Accessing environment variables
+  config();
+  const dbHost = process.env.DB_HOST;
+  const dbPort = process.env.DB_PORT || 27017;
+  const dbUsername = process.env.DB_USERNAME;
+  const dbPassword = process.env.DB_PASSWORD;
+  const dbName = process.env.DB_NAME;
+
+  // Database connection string
+  const connectionString = `mongodb://${dbUsername}:${dbPassword}@${dbHost}:${dbPort}/?authSource=admin`;
+
+  async function connectDatabase() {
+    try {
+      await mongoose.connect(connectionString, { dbName });
+      console.log("Connected to the database successfully");
+    } catch (error) {
+      console.error("Failed to connect to the database:", error);
+      process.exit(1);
+    }
+  }
+
+  export { connectDatabase };
+  ```
+
+### Connect and Run Express server.
+
+- Inside `index.ts` file
+
+  ```ts
+  import { config } from "dotenv";
+  import { app } from "./app";
+  import { connectDatabase } from "./database";
+
+  // Accessing environment variables
+  config();
+  const port = process.env.PORT || 5000;
+
+  // Running the server
+  connectDatabase()
+    .then(() => {
+      app.on("error", (error) => {
+        console.error("Failed to start the server", error);
+        process.exit(1);
+      });
+
+      app.listen(port, () => {
+        console.log(`Server is running on port ${port}`);
+      });
+    })
+    .catch((error) => {
+      console.error("Failed to connect to the database:", error);
+    });
+  ```
+
+### Types for User
+
+- These types helps to write type safe code and give autocomplete suggestions, Both are great to have.
+
+- Inside `types/user.type.ts` file
+
+  ```ts
+  import mongoose from "mongoose";
+
+  export interface UserType {
+    _id: mongoose.Types.ObjectId;
+    name: string;
+    email: string;
+    fullName: string;
+    password: string;
+    avatar: string;
+    coverImage?: string;
+    role: "user" | "artist";
+    refreshToken?: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }
+
+  export type CreateUserType = Omit<
+    UserType,
+    "_id" | "createdAt" | "updatedAt"
+  > & {
+    role?: "user" | "artist";
+  };
+
+  export type UpdateUserType = Partial<
+    Omit<UserType, "_id" | "createdAt" | "updatedAt">
+  >;
+
+  export type UserResponseType = Omit<UserType, "password" | "refreshToken">;
+  ```
+
+### Model for User
+
+- Inside `models/user.model.ts` file
+
+  ```ts
+  import mongoose from "mongoose";
+  import { UserType } from "../types/user.type";
+
+  // Email validator regex
+  const emailValidatorRegex =
+    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+  const userSchema = new mongoose.Schema<UserType>(
+    {
+      name: {
+        type: String,
+        required: [true, "Username is required"],
+        trim: true,
+        unique: true,
+        lowercase: true,
+        index: true,
+      },
+      email: {
+        type: String,
+        required: [true, "Email is required"],
+        trim: true,
+        unique: true,
+        lowercase: true,
+        index: true,
+        match: [emailValidatorRegex, "Please enter a valid email"],
+      },
+      fullName: {
+        type: String,
+        required: [true, "Fullname is required"],
+        trim: true,
+      },
+      password: {
+        type: String,
+        required: [true, "Password is required"],
+        trim: true,
+      },
+      avatar: {
+        type: String,
+        required: [true, "User avatar is required"],
+      },
+      coverImage: {
+        type: String,
+      },
+      role: {
+        type: String,
+        enum: ["user", "artist"],
+        required: true,
+        default: "user",
+      },
+      refreshToken: {
+        type: String,
+      },
+    },
+    { timestamps: true }
+  );
+
+  export const User = mongoose.model<UserType>("User", userSchema);
+  ```
+
+- Test the Database Connection
