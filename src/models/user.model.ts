@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema<UserType>(
       trim: true,
       unique: true,
       lowercase: true,
+      index: true,
     },
     email: {
       type: String,
@@ -19,6 +20,7 @@ const userSchema = new mongoose.Schema<UserType>(
       trim: true,
       unique: true,
       lowercase: true,
+      index: true,
       match: [emailValidatorRegex, "Please enter a valid email"],
     },
     fullName: {

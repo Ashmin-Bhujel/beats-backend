@@ -2,7 +2,9 @@ import { config } from "dotenv";
 import express, { Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { APIError, APIResponse } from "./utils";
+import { APIResponse } from "./utils/apiResponse";
+import { APIError } from "./utils/apiError";
+import userRouter from "./routes/user.route";
 
 // Accessing environment variables
 config();
@@ -32,12 +34,8 @@ app.get("/", (_, res: Response) => {
     );
 });
 
-// API v1 route
-app.get("/api/v1", (_, res: Response) => {
-  res
-    .status(200)
-    .json(new APIResponse(200, "Backend service for Beats, API v1"));
-});
+// Routes
+app.use("/api/v1/user", userRouter);
 
 // Handle undefined routes
 app.use((_, res: Response) => {
