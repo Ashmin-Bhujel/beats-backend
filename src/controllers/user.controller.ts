@@ -1,11 +1,23 @@
+import mongoose from "mongoose";
 import { User } from "../models/user.model";
 import { CreateUserType, UserResponseType, UserType } from "../types/user.type";
 import { APIError } from "../utils/apiError";
 import { APIResponse } from "../utils/apiResponse";
 import { asyncHandler } from "../utils/asyncHandler";
+import { config } from "dotenv";
+import { CookieOptions } from "express";
+
+// Accessing environment variables
+config();
+const nodeEnvironment = process.env.NODE_ENV;
+const cookiesOptions: CookieOptions = {
+  httpOnly: true,
+  secure: nodeEnvironment === "production",
+  sameSite: nodeEnvironment === "production" ? "none" : "lax",
+};
 
 // Tokens generator
-async function generateTokens(userId: string) {
+async function generateTokens(userId: mongoose.Types.ObjectId) {
   try {
     // Get user from database
     const user: UserType | null = await User.findById(userId);
@@ -17,7 +29,7 @@ async function generateTokens(userId: string) {
 
     // Generate access and refresh tokens
     const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
 
     // Check if the tokens are generated or not
     if (!accessToken || !refreshToken) {
@@ -89,4 +101,55 @@ const createUser = asyncHandler(async (req, res) => {
   );
 });
 
-export { createUser };
+// Login user
+const loginUser = asyncHandler(async (req, res) => {
+  // Get name/email and password from request body
+  const { name, email, password } = req.body;
+
+  // Validate received data
+  if (!name && !email) {
+    throw new APIError(400, "Username or email is required");
+  }
+  if (!password) {
+    throw new APIError(400, "Password is required");
+  }
+
+  // Get user from database
+  const user: UserType | null = await User.findOne({
+    $or: [{ name }, { email }],
+  });
+
+  // Check if user exist or not
+  if (!user) {
+    throw new APIError(404, "Invalid user credentials or user does not exits");
+  }
+
+  // Validate with original password
+  const isValidPassword = await user.validatePassword(password);
+  if (!isValidPassword) {
+    throw new APIError(401, "Incorrect password");
+  }
+
+  // Generate JWT tokens
+  const { accessToken, refreshToken } = await generateTokens(user._id);
+
+  // Get the logged in user
+  const loggedInUser: UserResponseType | null = await User.findById(
+    user._id
+  ).select("-password -refreshToken");
+
+  // Send back response
+  res
+    .status(200)
+    .cookie("accessToken", accessToken, cookiesOptions)
+    .cookie("refreshToken", refreshToken, cookiesOptions)
+    .json(
+      new APIResponse(200, "User logged in successfully", {
+        user: loggedInUser,
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+      })
+    );
+});
+
+export { createUser, loginUser };

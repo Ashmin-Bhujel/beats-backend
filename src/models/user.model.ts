@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { UserType } from "../types/user.type";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { APIError } from "../utils/apiError";
+import bcrypt from "bcrypt";
 
 // Accessing environment variables
 config();
@@ -63,6 +64,23 @@ const userSchema = new mongoose.Schema<UserType>(
   { timestamps: true }
 );
 
+// Hashing the password before saving the data
+userSchema.pre("save", async function (next) {
+  // Skip if password is not modified
+  if (!this.isModified("password")) {
+    next();
+  }
+
+  // Hash the password
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+// Password validator
+userSchema.methods.validatePassword = async function (password: string) {
+  return await bcrypt.compare(password, this.password);
+};
+
 // Method for generating access token
 userSchema.methods.generateAccessToken = function () {
   if (!accessTokenSecret || !accessTokenExpiry) {
@@ -92,6 +110,7 @@ userSchema.methods.generateRefreshToken = function () {
   return jwt.sign(
     {
       _id: this._id,
+      role: this.role,
     },
     refreshTokenSecret,
     { expiresIn: refreshTokenExpiry } as SignOptions

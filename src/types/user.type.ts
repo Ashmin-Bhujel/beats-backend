@@ -12,6 +12,7 @@ export interface UserType extends Document {
   refreshToken?: string;
   createdAt: Date;
   updatedAt: Date;
+  validatePassword: (password: string) => boolean;
   generateAccessToken: () => string;
   generateRefreshToken: () => string;
 }
