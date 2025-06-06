@@ -448,3 +448,179 @@ The goal was to initialize and configure the basic setup of the project.
   ```
 
 - Test the Database Connection
+
+## [ 4 ] Hash Password and User Login Controller
+
+### Hash Password
+
+- Used `bcrypt` library to hash the user password before saving to the database
+
+- Inside `user.model.ts` file
+
+  ```ts
+  // Hashing the password before saving the data
+  userSchema.pre("save", async function (next) {
+    // Skip if password is not modified
+    if (!this.isModified("password")) {
+      next();
+    }
+
+    // Hash the password
+    this.password = await bcrypt.hash(this.password, 10);
+    next();
+  });
+  ```
+
+- Also made a method to validate user input password to the original password
+
+  ```ts
+  // Password validator
+  userSchema.methods.validatePassword = async function (password: string) {
+    return await bcrypt.compare(password, this.password);
+  };
+  ```
+
+### User Login Controller
+
+- Before writing controller for user login, created methods inside `user.model.ts` file to generate access and refresh token using JWT.
+
+  ```ts
+  // Method for generating access token
+  userSchema.methods.generateAccessToken = function () {
+    if (!accessTokenSecret || !accessTokenExpiry) {
+      throw new APIError(400, "JWT configurations are missing");
+    }
+
+    return jwt.sign(
+      {
+        _id: this._id,
+        name: this.name,
+        email: this.email,
+        role: this.role,
+      },
+      accessTokenSecret,
+      {
+        expiresIn: accessTokenExpiry,
+      } as SignOptions
+    );
+  };
+
+  // Method for generating refresh token
+  userSchema.methods.generateRefreshToken = function () {
+    if (!refreshTokenSecret || !refreshTokenExpiry) {
+      throw new APIError(400, "JWT configurations are missing");
+    }
+
+    return jwt.sign(
+      {
+        _id: this._id,
+        role: this.role,
+      },
+      refreshTokenSecret,
+      { expiresIn: refreshTokenExpiry } as SignOptions
+    );
+  };
+  ```
+
+- Created a function called `generateTokens` to generate and save refresh token into the database inside the `user.controller.ts` file.
+
+  ```ts
+  // Tokens generator
+  async function generateTokens(userId: mongoose.Types.ObjectId) {
+    try {
+      // Get user from database
+      const user: UserType | null = await User.findById(userId);
+
+      // Check user exist or not
+      if (!user) {
+        throw new APIError(404, "Failed to get user");
+      }
+
+      // Generate access and refresh tokens
+      const accessToken = user.generateAccessToken();
+      const refreshToken = user.generateRefreshToken();
+
+      // Check if the tokens are generated or not
+      if (!accessToken || !refreshToken) {
+        throw new APIError(500, "Failed to generate tokens");
+      }
+
+      // Save the refresh token in database
+      user.refreshToken = refreshToken;
+      await user.save({ validateBeforeSave: false });
+
+      // Return the generated tokens
+      return {
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+      };
+    } catch (error) {
+      throw new APIError(
+        500,
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while generating tokens"
+      );
+    }
+  }
+  ```
+
+- Create controller for user login
+
+  ```ts
+  // Login user
+  const loginUser = asyncHandler(async (req, res) => {
+    // Get name/email and password from request body
+    const { name, email, password } = req.body;
+
+    // Validate received data
+    if (!name && !email) {
+      throw new APIError(400, "Username or email is required");
+    }
+    if (!password) {
+      throw new APIError(400, "Password is required");
+    }
+
+    // Get user from database
+    const user: UserType | null = await User.findOne({
+      $or: [{ name }, { email }],
+    });
+
+    // Check if user exist or not
+    if (!user) {
+      throw new APIError(
+        404,
+        "Invalid user credentials or user does not exits"
+      );
+    }
+
+    // Validate with original password
+    const isValidPassword = await user.validatePassword(password);
+    if (!isValidPassword) {
+      throw new APIError(401, "Incorrect password");
+    }
+
+    // Generate JWT tokens
+    const { accessToken, refreshToken } = await generateTokens(user._id);
+
+    // Get the logged in user
+    const loggedInUser: UserResponseType | null = await User.findById(
+      user._id
+    ).select("-password -refreshToken");
+
+    // Send back response
+    res
+      .status(200)
+      .cookie("accessToken", accessToken, cookiesOptions)
+      .cookie("refreshToken", refreshToken, cookiesOptions)
+      .json(
+        new APIResponse(200, "User logged in successfully", {
+          user: loggedInUser,
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+        })
+      );
+  });
+  ```
+
+- Test the controller
