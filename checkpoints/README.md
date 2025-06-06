@@ -45,13 +45,11 @@ The goal was to initialize and configure the basic setup of the project.
 - [x] Add scripts inside `package.json` file
 
   ```json
-  ...
   "scripts": {
     "dev": "nodemon ./src/index.ts",
     "start": "node ./build/index.js",
     "build": "tsc -p ."
   }
-  ...
   ```
 
 - [x] Configure `.gitignore`, `.prettierrc` and `.prettierignore` files

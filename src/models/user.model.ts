@@ -1,5 +1,15 @@
+import { config } from "dotenv";
 import mongoose from "mongoose";
 import { UserType } from "../types/user.type";
+import jwt, { SignOptions } from "jsonwebtoken";
+import { APIError } from "../utils/apiError";
+
+// Accessing environment variables
+config();
+const accessTokenSecret = process.env.ACCESS_TOKEN_SECRET;
+const accessTokenExpiry = process.env.ACCESS_TOKEN_EXPIRY;
+const refreshTokenSecret = process.env.REFRESH_TOKEN_SECRET;
+const refreshTokenExpiry = process.env.REFRESH_TOKEN_EXPIRY;
 
 // Email validator regex
 const emailValidatorRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -52,5 +62,40 @@ const userSchema = new mongoose.Schema<UserType>(
   },
   { timestamps: true }
 );
+
+// Method for generating access token
+userSchema.methods.generateAccessToken = function () {
+  if (!accessTokenSecret || !accessTokenExpiry) {
+    throw new APIError(400, "JWT configurations are missing");
+  }
+
+  return jwt.sign(
+    {
+      _id: this._id,
+      name: this.name,
+      email: this.email,
+      role: this.role,
+    },
+    accessTokenSecret,
+    {
+      expiresIn: accessTokenExpiry,
+    } as SignOptions
+  );
+};
+
+// Method for generating refresh token
+userSchema.methods.generateRefreshToken = function () {
+  if (!refreshTokenSecret || !refreshTokenExpiry) {
+    throw new APIError(400, "JWT configurations are missing");
+  }
+
+  return jwt.sign(
+    {
+      _id: this._id,
+    },
+    refreshTokenSecret,
+    { expiresIn: refreshTokenExpiry } as SignOptions
+  );
+};
 
 export const User = mongoose.model<UserType>("User", userSchema);

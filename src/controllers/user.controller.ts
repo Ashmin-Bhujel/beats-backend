@@ -4,6 +4,45 @@ import { APIError } from "../utils/apiError";
 import { APIResponse } from "../utils/apiResponse";
 import { asyncHandler } from "../utils/asyncHandler";
 
+// Tokens generator
+async function generateTokens(userId: string) {
+  try {
+    // Get user from database
+    const user: UserType | null = await User.findById(userId);
+
+    // Check user exist or not
+    if (!user) {
+      throw new APIError(404, "Failed to get user");
+    }
+
+    // Generate access and refresh tokens
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateAccessToken();
+
+    // Check if the tokens are generated or not
+    if (!accessToken || !refreshToken) {
+      throw new APIError(500, "Failed to generate tokens");
+    }
+
+    // Save the refresh token in database
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+
+    // Return the generated tokens
+    return {
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    };
+  } catch (error) {
+    throw new APIError(
+      500,
+      error instanceof Error
+        ? error.message
+        : "Something went wrong while generating tokens"
+    );
+  }
+}
+
 // Create user controller
 const createUser = asyncHandler(async (req, res) => {
   // Get new user data from request body

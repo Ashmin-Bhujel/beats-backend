@@ -1,6 +1,6 @@
-import mongoose from "mongoose";
+import mongoose, { Document } from "mongoose";
 
-export interface UserType {
+export interface UserType extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
   email: string;
@@ -12,6 +12,8 @@ export interface UserType {
   refreshToken?: string;
   createdAt: Date;
   updatedAt: Date;
+  generateAccessToken: () => string;
+  generateRefreshToken: () => string;
 }
 
 export type CreateUserType = Omit<
