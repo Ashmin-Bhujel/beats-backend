@@ -624,3 +624,246 @@ The goal was to initialize and configure the basic setup of the project.
   ```
 
 - Test the controller
+
+## [ 5 ] User Logout Controller and Cloudinary Setup
+
+### User Logout Controller
+
+- Create controller for user logout, before that created middleware for auth so that when a user is logged in some of the user data is accessible through the request object which in injected by the auth middleware.
+
+- Inside `auth.middleware.ts` file
+
+  ```ts
+  import { config } from "dotenv";
+  import { APIError } from "../utils/apiError";
+  import { asyncHandler } from "../utils/asyncHandler";
+  import jwt, { JwtPayload } from "jsonwebtoken";
+  import { UserResponseType } from "../types/user.type";
+  import { User } from "../models/user.model";
+  import "../types/express.type";
+
+  // Accessing environment variables
+  config();
+  const accessTokenSecret = process.env.ACCESS_TOKEN_SECRET;
+  if (!accessTokenSecret) {
+    throw new APIError(400, "JWT configurations are missing");
+  }
+
+  const verifyJWT = asyncHandler(async (req, res, next) => {
+    try {
+      // Get access token from cookies for request header (authorization header)
+      const accessToken =
+        req.cookies?.accessToken ||
+        req.header("Authorization")?.replace("Bearer ", "");
+
+      // Check if have accessToken or not
+      if (!accessToken) {
+        throw new APIError(401, "Unauthorized request");
+      }
+
+      // Decode the accessToken
+      const decodedAccessToken = jwt.verify(
+        accessToken,
+        accessTokenSecret
+      ) as JwtPayload;
+
+      // Get user from database
+      const user: UserResponseType | null = await User.findById(
+        decodedAccessToken?._id
+      ).select("-password -refreshToken");
+
+      // Check for user
+      if (!user) {
+        throw new APIError(401, "Invalid access token");
+      }
+
+      // Add user to request object
+      req.user = user;
+
+      // Pass the control to next
+      next();
+    } catch (error) {
+      // If it's already an APIError, re-throw it
+      if (error instanceof APIError) {
+        throw error;
+      }
+
+      // Handle JWT-specific errors
+      if (error instanceof jwt.JsonWebTokenError) {
+        throw new APIError(401, "Invalid access token");
+      }
+      if (error instanceof jwt.TokenExpiredError) {
+        throw new APIError(401, "Access token expired");
+      }
+
+      // Handle other errors (likely database errors)
+      throw new APIError(500, "Internal server error");
+    }
+  });
+
+  export { verifyJWT };
+  ```
+
+- Inside `user.controller.ts` file
+
+  ```ts
+  // Logout user
+  const logoutUser = asyncHandler(async (req, res) => {
+    // Unset the refresh token in database
+    await User.findByIdAndUpdate(req.user?._id, {
+      $unset: {
+        refreshToken: 1,
+      },
+    });
+
+    // Clear cookies and send back response
+    res
+      .status(200)
+      .clearCookie("accessToken", cookiesOptions)
+      .clearCookie("refreshToken", cookiesOptions)
+      .json(new APIResponse(200, "User logged out successfully"));
+  });
+  ```
+
+### Cloudinary Setup
+
+- Before setting up Cloudinary created a middleware for multer.
+
+- Inside `multer.middleware.ts` file
+
+  ```ts
+  import multer from "multer";
+
+  // Configure disk storage for multer
+  const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, "./public/temp");
+    },
+    filename: function (req, file, cb) {
+      cb(null, Date.now() + "-" + file.originalname);
+    },
+  });
+
+  export const upload = multer({ storage });
+  ```
+
+- Create util function for cloudinary
+
+- Inside `utils/cloudinary.ts` file
+
+  ```ts
+  import { v2 as cloudinary, UploadApiResponse } from "cloudinary";
+  import { config } from "dotenv";
+  import fs from "fs";
+
+  // Accessing environment variables
+  config();
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  const mainFolder = process.env.CLOUDINARY_MAIN_FOLDER;
+
+  // Configure cloudinary
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+  });
+
+  // Asset type
+  export type AssetType = "image" | "raw" | "video";
+
+  // Method for uploading
+  async function uploadOnCloudinary(
+    localFilePath: string,
+    folder: string
+  ): Promise<UploadApiResponse | null> {
+    try {
+      if (!localFilePath) {
+        throw new Error("Invalid file path");
+      }
+
+      const response = await cloudinary.uploader.upload(localFilePath, {
+        resource_type: "auto",
+        folder: `${mainFolder}/${folder}`,
+      });
+
+      // Remove file from disk after uploading
+      fs.unlinkSync(localFilePath);
+      return response;
+    } catch (error) {
+      // Remove file from disk after failed to upload
+      fs.unlinkSync(localFilePath);
+      console.error("Failed to upload file:", error);
+      return null;
+    }
+  }
+
+  // Delete image file
+  async function deleteAssetOnCloudinary(
+    publicId: string,
+    assetType: AssetType = "image"
+  ) {
+    try {
+      const response = await cloudinary.uploader.destroy(publicId, {
+        resource_type: assetType,
+      });
+
+      return response;
+    } catch (error) {
+      console.error("Failed to delete the asset:", error);
+      return null;
+    }
+  }
+
+  export { uploadOnCloudinary, deleteAssetOnCloudinary };
+  ```
+
+- Previously when creating a user the avatar and coverImage files were not uploaded, It was just a field. After this we can use `uploadOnCloudinary` utility function to upload user's avatar and coverImage to Cloudinary to storage.
+
+- Modifications inside `loginUser` controller
+
+  ```ts
+  // After checking for existing user
+  // Upload images to server's local path
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+  const avatarLocalPath =
+    files?.avatar && Array.isArray(files?.avatar) && files?.avatar?.length > 0
+      ? files?.avatar[0]?.path
+      : "";
+
+  const coverImageLocalPath =
+    files?.coverImage &&
+    Array.isArray(files.coverImage) &&
+    files.coverImage.length > 0
+      ? files.coverImage[0]?.path
+      : "";
+
+  // Upload images to cloudinary
+  const avatar =
+    avatarLocalPath &&
+    (await uploadOnCloudinary(avatarLocalPath, `users/${newUser.name}`));
+  const coverImage =
+    coverImageLocalPath &&
+    (await uploadOnCloudinary(coverImageLocalPath, `users/${newUser.name}`));
+
+  // Check if avatar image is uploaded successfully
+  if (!avatar) {
+    throw new APIError(
+      400,
+      "Avatar image is required, while uploading to Cloudinary"
+    );
+  }
+
+  // Create a new user
+  Object.assign(newUser, {
+    ...newUser,
+    avatar: avatar.secure_url,
+    coverImage: coverImage ? coverImage.secure_url : "",
+  });
+  const user: UserType | null = await User.create(newUser);
+
+  // Then rest is same
+  ```
+
+- Test the configurations
