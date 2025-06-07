@@ -7,6 +7,7 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { config } from "dotenv";
 import { CookieOptions } from "express";
 import "../types/express.type";
+import { uploadOnCloudinary } from "../utils/cloudinary";
 
 // Accessing environment variables
 config();
@@ -67,7 +68,6 @@ const createUser = asyncHandler(async (req, res) => {
     !newUser.email ||
     !newUser.fullName ||
     !newUser.password ||
-    !newUser.avatar ||
     !newUser.role
   ) {
     throw new APIError(400, "Please provide all the required data");
@@ -81,7 +81,42 @@ const createUser = asyncHandler(async (req, res) => {
     throw new APIError(409, "User with same email or username already exists");
   }
 
+  // Upload images to server's local path
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+  const avatarLocalPath =
+    files?.avatar && Array.isArray(files?.avatar) && files?.avatar?.length > 0
+      ? files?.avatar[0]?.path
+      : "";
+
+  const coverImageLocalPath =
+    files?.coverImage &&
+    Array.isArray(files.coverImage) &&
+    files.coverImage.length > 0
+      ? files.coverImage[0]?.path
+      : "";
+
+  // Upload images to cloudinary
+  const avatar =
+    avatarLocalPath &&
+    (await uploadOnCloudinary(avatarLocalPath, `users/${newUser.name}`));
+  const coverImage =
+    coverImageLocalPath &&
+    (await uploadOnCloudinary(coverImageLocalPath, `users/${newUser.name}`));
+
+  // Check if avatar image is uploaded successfully
+  if (!avatar) {
+    throw new APIError(
+      400,
+      "Avatar image is required, while uploading to Cloudinary"
+    );
+  }
+
   // Create a new user
+  Object.assign(newUser, {
+    ...newUser,
+    avatar: avatar.secure_url,
+    coverImage: coverImage ? coverImage.secure_url : "",
+  });
   const user: UserType | null = await User.create(newUser);
 
   // Get created user
