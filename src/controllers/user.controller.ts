@@ -6,6 +6,7 @@ import { APIResponse } from "../utils/apiResponse";
 import { asyncHandler } from "../utils/asyncHandler";
 import { config } from "dotenv";
 import { CookieOptions } from "express";
+import "../types/express.type";
 
 // Accessing environment variables
 config();
@@ -152,4 +153,21 @@ const loginUser = asyncHandler(async (req, res) => {
     );
 });
 
-export { createUser, loginUser };
+// Logout user
+const logoutUser = asyncHandler(async (req, res) => {
+  // Unset the refresh token in database
+  await User.findByIdAndUpdate(req.user?._id, {
+    $unset: {
+      refreshToken: 1,
+    },
+  });
+
+  // Clear cookies and send back response
+  res
+    .status(200)
+    .clearCookie("accessToken", cookiesOptions)
+    .clearCookie("refreshToken", cookiesOptions)
+    .json(new APIResponse(200, "User logged out successfully"));
+});
+
+export { createUser, loginUser, logoutUser };
