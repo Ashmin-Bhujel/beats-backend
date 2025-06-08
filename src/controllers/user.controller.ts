@@ -8,10 +8,12 @@ import { config } from "dotenv";
 import { CookieOptions } from "express";
 import "../types/express.type";
 import { uploadOnCloudinary } from "../utils/cloudinary";
+import jwt, { JwtPayload } from "jsonwebtoken";
 
 // Accessing environment variables
 config();
 const nodeEnvironment = process.env.NODE_ENV;
+const refreshTokenSecret = process.env.REFRESH_TOKEN_SECRET;
 const cookiesOptions: CookieOptions = {
   httpOnly: true,
   secure: nodeEnvironment === "production",
@@ -205,4 +207,56 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new APIResponse(200, "User logged out successfully"));
 });
 
-export { createUser, loginUser, logoutUser };
+// Refresh access token for user
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  // Get refresh token from cookies or request object
+  const incomingRefreshToken =
+    req.cookies?.refreshToken || req.body?.refreshToken;
+
+  // Check the received refresh token
+  if (!incomingRefreshToken) {
+    throw new APIError(401, "Unauthorized request");
+  }
+
+  // Decode the refresh token
+  if (!refreshTokenSecret) {
+    throw new APIError(400, "JWT configurations are missing");
+  }
+  const decodedRefreshToken = jwt.verify(
+    incomingRefreshToken,
+    refreshTokenSecret
+  ) as JwtPayload;
+
+  // Check decoded refresh token
+  if (!decodedRefreshToken) {
+    throw new APIError(
+      500,
+      "Something went wrong while decoding refresh token"
+    );
+  }
+
+  // Get user from database
+  const user: UserType | null = await User.findById(decodedRefreshToken?._id);
+
+  // Check user
+  if (!user) {
+    throw new APIError(401, "Invalid refresh token");
+  }
+
+  // Generate new tokens
+  const { accessToken, refreshToken } = await generateTokens(user?._id);
+
+  // Send back response
+  res
+    .status(200)
+    .cookie("accessToken", accessToken, cookiesOptions)
+    .cookie("refreshToken", refreshToken, cookiesOptions)
+    .json(
+      new APIResponse(200, "Refreshed access token successfully", {
+        accessToken,
+        refreshToken,
+      })
+    );
+});
+
+export { createUser, loginUser, logoutUser, refreshAccessToken };

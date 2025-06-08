@@ -110,7 +110,6 @@ userSchema.methods.generateRefreshToken = function () {
   return jwt.sign(
     {
       _id: this._id,
-      role: this.role,
     },
     refreshTokenSecret,
     { expiresIn: refreshTokenExpiry } as SignOptions

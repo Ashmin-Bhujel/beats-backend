@@ -3,6 +3,7 @@ import {
   createUser,
   loginUser,
   logoutUser,
+  refreshAccessToken,
 } from "../controllers/user.controller";
 import { verifyJWT } from "../middlewares/auth.middleware";
 import { upload } from "../middlewares/multer.middleware";
@@ -24,6 +25,7 @@ userRouter.post(
   createUser
 );
 userRouter.post("/login", loginUser);
+userRouter.post("/refreshAccessToken", refreshAccessToken);
 
 // Protected routes
 userRouter.post("/logout", verifyJWT, logoutUser);
