@@ -21,3 +21,4 @@ Click on a specific checkpoint below to view its detailed information:
 - [x] [[ 3 ] Connect to Database and User Types, Model](./checkpoints/README.md/#-3--connect-to-database-and-create-user-types-model)
 - [x] [[ 4 ] Hash Password and User Login Controller](./checkpoints/README.md/#-4--hash-password-and-user-login-controller)
 - [x] [[ 5 ] User Logout Controller and Cloudinary Setup](./checkpoints/README.md/#-5--user-logout-controller-and-cloudinary-setup)
+- [x] [[ 6 ] User Refresh Access Token Controller and Song Model](./checkpoints/README.md/#-6--user-refresh-access-token-controller-and-song-model)

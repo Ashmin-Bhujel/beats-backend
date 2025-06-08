@@ -867,3 +867,133 @@ The goal was to initialize and configure the basic setup of the project.
   ```
 
 - Test the configurations
+
+## [ 6 ] User Refresh Access Token Controller and Song Model
+
+- Create a controller for refreshing user access token
+
+- Inside `user.controller.ts` file
+
+  ```ts
+  // Refresh access token for user
+  const refreshAccessToken = asyncHandler(async (req, res) => {
+    // Get refresh token from cookies or request object
+    const incomingRefreshToken =
+      req.cookies?.refreshToken || req.body?.refreshToken;
+
+    // Check the received refresh token
+    if (!incomingRefreshToken) {
+      throw new APIError(401, "Unauthorized request");
+    }
+
+    // Decode the refresh token
+    if (!refreshTokenSecret) {
+      throw new APIError(400, "JWT configurations are missing");
+    }
+    const decodedRefreshToken = jwt.verify(
+      incomingRefreshToken,
+      refreshTokenSecret
+    ) as JwtPayload;
+
+    // Check decoded refresh token
+    if (!decodedRefreshToken) {
+      throw new APIError(
+        500,
+        "Something went wrong while decoding refresh token"
+      );
+    }
+
+    // Get user from database
+    const user: UserType | null = await User.findById(decodedRefreshToken?._id);
+
+    // Check user
+    if (!user) {
+      throw new APIError(401, "Invalid refresh token");
+    }
+
+    // Generate new tokens
+    const { accessToken, refreshToken } = await generateTokens(user?._id);
+
+    // Send back response
+    res
+      .status(200)
+      .cookie("accessToken", accessToken, cookiesOptions)
+      .cookie("refreshToken", refreshToken, cookiesOptions)
+      .json(
+        new APIResponse(200, "Refreshed access token successfully", {
+          accessToken,
+          refreshToken,
+        })
+      );
+  });
+  ```
+
+- Types for song entity
+
+- inside `song.type.ts` file
+
+  ```ts
+  import mongoose from "mongoose";
+
+  export interface SongType {
+    _id: mongoose.Types.ObjectId;
+    name: string;
+    songFile: string;
+    duration: number;
+    artist: mongoose.Types.ObjectId;
+    image: string;
+    isPublished: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  }
+
+  export type CreateSongType = Omit<
+    SongType,
+    "_id" | "createdAt" | "updatedAt"
+  >;
+  ```
+
+- Used the types of song to create model for song entity
+
+- inside `song.model.ts` file
+
+  ```ts
+  import mongoose from "mongoose";
+  import { CreateSongType } from "../types/song.type";
+
+  const songSchema = new mongoose.Schema<CreateSongType>(
+    {
+      name: {
+        type: String,
+        required: [true, "Song name is required"],
+        trim: true,
+      },
+      songFile: {
+        type: String,
+        required: [true, "Song file is required"],
+      },
+      duration: {
+        type: Number,
+        required: [true, "Song duration is required"],
+        default: 0,
+      },
+      artist: {
+        type: mongoose.SchemaTypes.ObjectId,
+        ref: "User",
+        required: [true, "Song artist is required"],
+      },
+      image: {
+        type: String,
+        required: [true, "Song image is required"],
+      },
+      isPublished: {
+        type: Boolean,
+        required: [true, "Song published status is required"],
+        default: false,
+      },
+    },
+    { timestamps: true }
+  );
+
+  export const Song = mongoose.model("Song", songSchema);
+  ```
