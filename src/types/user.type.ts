@@ -17,15 +17,23 @@ export interface UserType extends Document {
   generateRefreshToken: () => string;
 }
 
-export type CreateUserType = Omit<
-  UserType,
-  "_id" | "createdAt" | "updatedAt"
-> & {
-  role?: "user" | "artist";
-};
-
-export type UpdateUserType = Partial<
-  Omit<UserType, "_id" | "createdAt" | "updatedAt">
+export type CreateUserType = Partial<
+  Omit<
+    UserType,
+    | "_id"
+    | "createdAt"
+    | "updatedAt"
+    | "validatePassword"
+    | "generateAccessToken"
+    | "generateRefreshToken"
+  >
 >;
 
-export type UserResponseType = Omit<UserType, "password" | "refreshToken">;
+export type UserResponseType = Omit<
+  UserType,
+  | "password"
+  | "refreshToken"
+  | "validatePassword"
+  | "generateAccessToken"
+  | "generateRefreshToken"
+>;

@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
-import { CreateSongType } from "../types/song.type";
+import { SongType } from "../types/song.type";
 
-const songSchema = new mongoose.Schema<CreateSongType>(
+const songSchema = new mongoose.Schema<SongType>(
   {
     name: {
       type: String,

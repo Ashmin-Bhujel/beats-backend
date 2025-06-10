@@ -1,6 +1,6 @@
-import mongoose from "mongoose";
+import mongoose, { Document } from "mongoose";
 
-export interface SongType {
+export interface SongType extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
   songFile: string;
@@ -12,4 +12,6 @@ export interface SongType {
   updatedAt: Date;
 }
 
-export type CreateSongType = Omit<SongType, "_id" | "createdAt" | "updatedAt">;
+export type CreateSongType = Partial<
+  Omit<SongType, "_id" | "createdAt" | "updatedAt">
+>;
