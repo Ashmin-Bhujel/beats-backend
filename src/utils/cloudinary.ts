@@ -22,7 +22,8 @@ export type AssetType = "image" | "raw" | "video";
 // Method for uploading
 async function uploadOnCloudinary(
   localFilePath: string,
-  folder: string
+  folder: string,
+  assetType: AssetType = "image"
 ): Promise<UploadApiResponse | null> {
   try {
     if (!localFilePath) {
@@ -30,7 +31,7 @@ async function uploadOnCloudinary(
     }
 
     const response = await cloudinary.uploader.upload(localFilePath, {
-      resource_type: "auto",
+      resource_type: assetType,
       folder: `${mainFolder}/${folder}`,
     });
 
