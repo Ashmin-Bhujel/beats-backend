@@ -62,22 +62,16 @@ async function generateTokens(userId: mongoose.Types.ObjectId) {
 // Create user controller
 const createUser = asyncHandler(async (req, res) => {
   // Get new user data from request body
-  const newUser: CreateUserType = req.body;
+  const { name, email, fullName, password, role } = req.body;
 
   // Validate the received data
-  if (
-    !newUser.name ||
-    !newUser.email ||
-    !newUser.fullName ||
-    !newUser.password ||
-    !newUser.role
-  ) {
+  if (!name || !email || !fullName || !password || !role) {
     throw new APIError(400, "Please provide all the required data");
   }
 
   // Check for existing user
   const existingUser: UserResponseType | null = await User.findOne({
-    $or: [{ name: newUser.name }, { email: newUser.email }],
+    $or: [{ name }, { email }],
   }).select("-password -refreshToken");
   if (existingUser) {
     throw new APIError(409, "User with same email or username already exists");
@@ -100,10 +94,10 @@ const createUser = asyncHandler(async (req, res) => {
   // Upload images to cloudinary
   const avatar =
     avatarLocalPath &&
-    (await uploadOnCloudinary(avatarLocalPath, `users/${newUser.name}`));
+    (await uploadOnCloudinary(avatarLocalPath, `users/${name}/images`));
   const coverImage =
     coverImageLocalPath &&
-    (await uploadOnCloudinary(coverImageLocalPath, `users/${newUser.name}`));
+    (await uploadOnCloudinary(coverImageLocalPath, `users/${name}/images`));
 
   // Check if avatar image is uploaded successfully
   if (!avatar) {
@@ -114,11 +108,15 @@ const createUser = asyncHandler(async (req, res) => {
   }
 
   // Create a new user
-  Object.assign(newUser, {
-    ...newUser,
+  const newUser: CreateUserType = {
+    name,
+    email,
+    fullName,
+    password,
+    role,
     avatar: avatar.secure_url,
     coverImage: coverImage ? coverImage.secure_url : "",
-  });
+  };
   const user: UserType | null = await User.create(newUser);
 
   // Get created user

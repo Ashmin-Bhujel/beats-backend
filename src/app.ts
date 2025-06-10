@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import { APIResponse } from "./utils/apiResponse";
 import { APIError } from "./utils/apiError";
 import userRouter from "./routes/user.route";
+import songRouter from "./routes/song.route";
 
 // Accessing environment variables
 config();
@@ -36,6 +37,7 @@ app.get("/", (_, res: Response) => {
 
 // Routes
 app.use("/api/v1/user", userRouter);
+app.use("/api/v1/song", songRouter);
 
 // Handle undefined routes
 app.use((_, res: Response) => {
